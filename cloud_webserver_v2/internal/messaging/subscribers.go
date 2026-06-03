@@ -271,7 +271,7 @@ func CreateRawMatlabFile(id int, subscriberName string, ch <-chan SubscribedMess
 			if matlabWriter != nil {
 				err := matlabWriter.AddSignalValue(msg.GetContent())
 				if err != nil {
-					log.Fatal(err)
+					log.Fatalf("AddSignalValue error: %v", err)
 				}
 			}
 		}

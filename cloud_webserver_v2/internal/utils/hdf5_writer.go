@@ -28,7 +28,12 @@ type HDF5FixedBytesMessage struct {
 
 func toFixedBytesMessage(msg *HDF5WrapperMessage) *HDF5FixedBytesMessage {
 	var buf [MaxFixedBytesLen]byte
-	copy(buf[:], msg.Data.([]byte))
+	switch v := msg.Data.(type) {
+	case []byte:
+		copy(buf[:], v)
+	case string:
+		copy(buf[:], v)
+	}
 	return &HDF5FixedBytesMessage{
 		Data:      buf,
 		Timestamp: msg.Timestamp,
@@ -107,30 +112,32 @@ func (writer *HDF5Writer) exploreAndAddDataset(path string, chunk *hdf5.Group, d
 		msgs := data.([]*HDF5WrapperMessage)
 
 		// Create our own DataType based on what data we have
+		log.Printf("DEBUG CreateHDF5DataType: path=%q dataType=%T dataVal=%v", path, msgs[0].Data, msgs[0].Data)
 		dtype, err := CreateHDF5DataType(msgs) // is it str, char, slice etc?
 		if err != nil {
-			return err
+			return fmt.Errorf("CreateHDF5DataType failed at path %q (type %T): %w", path, msgs[0].Data, err)
 		}
 
 		// write table to chunk
 		table, err := chunk.CreateTable(path, dtype, 10, 0)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("CreateTable failed at path %q (type %T): %w", path, msgs[0].Data, err)
 		}
 		defer table.Close()
 
-		// Protobuf bytes fields ([]byte) use HDF5FixedBytesMessage to avoid
+		// []byte and string fields use HDF5FixedBytesMessage to avoid
 		// variable-length global heap allocation.
 		_, isBytes := msgs[0].Data.([]byte)
+		_, isString := msgs[0].Data.(string)
 		for i := 0; i != len(msgs); i++ {
-			if isBytes {
+			if isBytes || isString {
 				err = table.Append(toFixedBytesMessage(msgs[i]))
 			} else {
 				err = table.Append(msgs[i])
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("table.Append failed at path %q (type %T): %w", path, msgs[i].Data, err)
 			}
 		}
 
@@ -178,7 +185,9 @@ func FlattenSlice(data [][]float64) []float64 {
 func CreateHDF5DataType(data []*HDF5WrapperMessage) (*hdf5.Datatype, error) {
 	// Protobuf bytes fields ([]byte) use a fixed-length byte array to avoid
 	// variable-length global heap exhaustion in HDF5 1.10.x.
-	if _, isBytes := data[0].Data.([]byte); isBytes {
+	_, isBytes := data[0].Data.([]byte)
+	_, isString := data[0].Data.(string)
+	if isBytes || isString {
 		return createFixedBytesCompoundType()
 	}
 

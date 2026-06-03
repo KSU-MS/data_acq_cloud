@@ -64,7 +64,8 @@ func (w *RawMatlabWriter) AddSignalValue(decodedMessage *utils.DecodedMessage) e
 	}
 
 	for signalName, value := range signalValues {
-		w.processSignalValue(trimmedTopic, signalName, trimmedTopic+"."+signalName, value, float64(decodedMessage.LogTime)/1e9)
+		safeName := strings.ReplaceAll(signalName, "/", "_")
+		w.processSignalValue(trimmedTopic, safeName, trimmedTopic+"."+safeName, value, float64(decodedMessage.LogTime)/1e9)
 	}
 
 	if w.maxSignalLength > 100_000 {
@@ -126,7 +127,8 @@ func (w *RawMatlabWriter) processSignalValue(topic, signalName, signalPath strin
 // &{map[ConfigureableTest:map[test_bool:false test_double:2 test_float:1 test_int:2 test_string:asdf]] drivebrain_configuration 1741122430108270412}
 func (w *RawMatlabWriter) addJSONValues(decodedValue map[string]interface{}, givenMap map[string]interface{}, signalPath string, logTime float64) {
 	baseSignalPath := signalPath
-	for signalName, value := range decodedValue {
+	for rawSignalName, value := range decodedValue {
+		signalName := strings.ReplaceAll(rawSignalName, "/", "_")
 		baseSignalPath += "." + signalName
 		if _, ok := givenMap[signalName]; !ok {
 			givenMap[signalName] = make([]*utils.HDF5WrapperMessage, 0)
