@@ -112,7 +112,7 @@ func (writer *HDF5Writer) exploreAndAddDataset(path string, chunk *hdf5.Group, d
 		msgs := data.([]*HDF5WrapperMessage)
 
 		// Create our own DataType based on what data we have
-		log.Printf("DEBUG CreateHDF5DataType: path=%q dataType=%T dataVal=%v", path, msgs[0].Data, msgs[0].Data)
+		// log.Printf("DEBUG CreateHDF5DataType: path=%q dataType=%T dataVal=%v", path, msgs[0].Data, msgs[0].Data)
 		dtype, err := CreateHDF5DataType(msgs) // is it str, char, slice etc?
 		if err != nil {
 			return fmt.Errorf("CreateHDF5DataType failed at path %q (type %T): %w", path, msgs[0].Data, err)
@@ -120,7 +120,6 @@ func (writer *HDF5Writer) exploreAndAddDataset(path string, chunk *hdf5.Group, d
 
 		// write table to chunk
 		table, err := chunk.CreateTable(path, dtype, 10, 0)
-
 		if err != nil {
 			return fmt.Errorf("CreateTable failed at path %q (type %T): %w", path, msgs[0].Data, err)
 		}
@@ -259,6 +258,7 @@ func createFixedBytesCompoundType() (*hdf5.Datatype, error) {
 
 	return &cdt.Datatype, nil
 }
+
 func (writer *HDF5Writer) Close() error {
 	err := writer.rootGroup.Close()
 	if err != nil {
