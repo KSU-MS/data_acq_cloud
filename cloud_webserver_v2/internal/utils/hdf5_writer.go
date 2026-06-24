@@ -31,8 +31,6 @@ func toFixedBytesMessage(msg *HDF5WrapperMessage) *HDF5FixedBytesMessage {
 	switch v := msg.Data.(type) {
 	case []byte:
 		copy(buf[:], v)
-	case string:
-		copy(buf[:], v)
 	}
 	return &HDF5FixedBytesMessage{
 		Data:      buf,
@@ -125,12 +123,11 @@ func (writer *HDF5Writer) exploreAndAddDataset(path string, chunk *hdf5.Group, d
 		}
 		defer table.Close()
 
-		// []byte and string fields use HDF5FixedBytesMessage to avoid
-		// variable-length global heap allocation.
+		// []byte fields use HDF5FixedBytesMessage to avoid variable-length
+		// global heap allocation.
 		_, isBytes := msgs[0].Data.([]byte)
-		_, isString := msgs[0].Data.(string)
 		for i := 0; i != len(msgs); i++ {
-			if isBytes || isString {
+			if isBytes {
 				err = table.Append(toFixedBytesMessage(msgs[i]))
 			} else {
 				err = table.Append(msgs[i])
@@ -185,8 +182,7 @@ func CreateHDF5DataType(data []*HDF5WrapperMessage) (*hdf5.Datatype, error) {
 	// Protobuf bytes fields ([]byte) use a fixed-length byte array to avoid
 	// variable-length global heap exhaustion in HDF5 1.10.x.
 	_, isBytes := data[0].Data.([]byte)
-	_, isString := data[0].Data.(string)
-	if isBytes || isString {
+	if isBytes {
 		return createFixedBytesCompoundType()
 	}
 
