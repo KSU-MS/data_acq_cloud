@@ -17,12 +17,11 @@ type s3Session struct {
 	bucket        string
 }
 
-func NewS3Session(accessKey string, secretKey string, region string, bucket string, endpoint string) *S3Repository {
+func NewS3Session(accessKey string, secretKey string, region string, bucket string, endpoint string, publicEndpoint string) *S3Repository {
 	staticCreds := credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(region),
 		config.WithCredentialsProvider(staticCreds))
-
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)
 	}
@@ -30,9 +29,14 @@ func NewS3Session(accessKey string, secretKey string, region string, bucket stri
 	// Create an aws s3 service client
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true
 	})
-	presignClient := s3.NewPresignClient(client)
+	presignS3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(publicEndpoint)
+		o.UsePathStyle = true
+	})
 
+	presignClient := s3.NewPresignClient(presignS3Client)
 	session := &s3Session{
 		client:        client,
 		bucket:        bucket,

@@ -327,6 +327,9 @@ func (h *mcapHandler) DeleteMcapFromID(w http.ResponseWriter, r *http.Request) *
 }
 
 func (h *mcapHandler) ProcessMatlabJob(w http.ResponseWriter, r *http.Request) *HandlerError {
+	if h.mpsClient == nil {
+		return NewHandlerError("MATLAB Production Server is disabled", http.StatusServiceUnavailable)
+	}
 	ctx := r.Context()
 
 	scriptsParam := r.URL.Query().Get("scripts")
@@ -494,7 +497,6 @@ func (h *mcapHandler) CheckFileStatus(w http.ResponseWriter, r *http.Request) *H
 	fileHash := r.URL.Query().Get("file_hash")
 	if fileHash == "" {
 		return NewHandlerError("file_hash must not be empty", http.StatusBadRequest)
-
 	}
 	vehicle_runs, err := h.dbClient.VehicleRunUseCase().FindVehicleRunByMCAPFileHash(r.Context(), fileHash)
 	if err != nil {
@@ -502,7 +504,6 @@ func (h *mcapHandler) CheckFileStatus(w http.ResponseWriter, r *http.Request) *H
 			fmt.Sprintf("error checking file status for %q: %v", fileHash, err),
 			http.StatusInternalServerError,
 		)
-
 	}
 
 	hashExists := len(vehicle_runs) > 0

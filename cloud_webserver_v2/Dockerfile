@@ -3,9 +3,9 @@ FROM golang:1.23 AS go-builder
 
 # Install required build dependencies
 RUN apt-get update && apt-get install -y \
-    libhdf5-serial-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+  libhdf5-serial-dev \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -23,9 +23,9 @@ FROM ubuntu:22.04 AS runtime
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
-    libhdf5-serial-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+  libhdf5-serial-dev \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

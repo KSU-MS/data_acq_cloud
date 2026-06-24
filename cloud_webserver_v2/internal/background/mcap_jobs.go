@@ -187,7 +187,7 @@ func (p *PostProcessMCAPUploadJob) ProcessFileJob(fp *FileProcessor, job *FileJo
 
 	vehicleRunModel := &models.VehicleRunModel{
 		Date:         job.Date,
-		CarModel:     "HT09",
+		CarModel:     "KS9E",
 		McapFiles:    mcapFiles,
 		MatFiles:     matFiles,
 		ContentFiles: contentFiles,

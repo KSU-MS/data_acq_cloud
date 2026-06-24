@@ -55,8 +55,8 @@ func PlotLatLon(id int, subscriberName string, ch <-chan SubscribedMessage, resu
 	xs := make([]float64, 0)
 	ys := make([]float64, 0)
 	first := true
-	var originLon, originLat float64
-	minX, maxX, minY, maxY := math.MaxFloat64, math.SmallestNonzeroFloat64, math.MaxFloat64, math.SmallestNonzeroFloat64
+	var originLat, originLon float64
+	minX, maxX, minY, maxY := math.MaxFloat64, -math.MaxFloat64, math.MaxFloat64, -math.MaxFloat64
 
 	for msg := range ch {
 		if msg.GetContent().Topic == EOF {
@@ -69,30 +69,20 @@ func PlotLatLon(id int, subscriberName string, ch <-chan SubscribedMessage, resu
 		var lon float32
 		var ok bool
 
-		if gpsDynamicMessage, found := data["vn_gps"].(*dynamic.Message); found {
-			latFieldDescriptor := gpsDynamicMessage.FindFieldDescriptorByName("lat")
-			lonFieldDescriptor := gpsDynamicMessage.FindFieldDescriptorByName("lon")
-			if latFieldDescriptor == nil || lonFieldDescriptor == nil {
-				continue
-			}
-
-			decodedLat := gpsDynamicMessage.GetField(latFieldDescriptor)
-			decodedLon := gpsDynamicMessage.GetField(lonFieldDescriptor)
-			if decodedLat == nil || decodedLon == nil {
-				continue
-			}
-
-			if lat, ok = decodedLat.(float32); !ok {
-				log.Printf("lat is not a float, it is a: %v \n", reflect.TypeOf(lat))
-				continue
-			}
-			if lon, ok = decodedLon.(float32); !ok {
-				log.Printf("lon is not a float, it is a: %v \n", reflect.TypeOf(lon))
-				continue
-			}
-
+		decodedLat, latFound := data["evelogger_vectornav_latitude"]
+		decodedLon, lonFound := data["evelogger_vectornav_longitude"]
+		if !latFound || !lonFound {
+			continue
 		}
 
+		if lat, ok = decodedLat.(float32); !ok {
+			log.Printf("lat is not a float , it is a: %v \n", reflect.TypeOf(decodedLat))
+			continue
+		}
+		if lon, ok = decodedLon.(float32); !ok {
+			log.Printf("lon is not a float , it is a: %v \n", reflect.TypeOf(decodedLon))
+			continue
+		}
 		if lat == 0 || lon == 0 {
 			continue
 		}
@@ -159,7 +149,7 @@ func PlotTimeVelocity(id int, subscriberName string, ch <-chan SubscribedMessage
 
 			decodedFL := veh_vec_floatDynamicMessage.GetField(fl_Descriptor)
 			decodedFR := veh_vec_floatDynamicMessage.GetField(fr_Descriptor)
-			if decodedFL == nil || decodedFL == nil {
+			if decodedFL == nil || decodedFR == nil {
 				continue
 			}
 

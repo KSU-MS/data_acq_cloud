@@ -19,7 +19,6 @@ import (
 	"github.com/hytech-racing/cloud-webserver-v2/internal/logging"
 	hytech_middleware "github.com/hytech-racing/cloud-webserver-v2/internal/middleware"
 	"github.com/hytech-racing/cloud-webserver-v2/internal/mps"
-	proto_sync "github.com/hytech-racing/cloud-webserver-v2/internal/proto_sync"
 	"github.com/hytech-racing/cloud-webserver-v2/internal/s3"
 	"github.com/joho/godotenv"
 )
@@ -71,9 +70,12 @@ func main() {
 	log.Println("Connected to database...")
 
 	// Setup MPS
-	mpsURI := os.Getenv("MATLAB_URI")
-	mpsClient := mps.NewMatlabClient(dbClient, mpsURI, 1*time.Second)
+	// MPS is intentionally disabled for local/dev usage until licensing is configured.
+	// Keep this as nil so the server can run without initializing MATLAB Production Server.
 
+	//mpsURI := os.Getenv("MATLAB_URI")
+	//mpsClient := mps.NewMatlabClient(dbClient, mpsURI, 1*time.Second)
+	var mpsClient *mps.MatlabClient = nil
 	// Setup aws s3 connection
 	awsRegion := os.Getenv("AWS_REGION")
 	if awsRegion == "" {
@@ -99,13 +101,18 @@ func main() {
 	if awsS3EndPoint == "" {
 		log.Fatal("could not get aws s3 endpoint environment variable")
 	}
+	awsS3PublicEndPoint := os.Getenv("AWS_S3_PUBLIC_ENDPOINT")
+	if awsS3PublicEndPoint == "" {
+		log.Fatal("could not get aws s3 public endpoint environment variable")
+	}
 
 	// We are creating one connection to AWS S3 and passing that around to all the methods to save resources
-	s3Repository := s3.NewS3Session(awsAccessKey, awsSecretKey, awsRegion, awsBucket, awsS3EndPoint)
+	s3Repository := s3.NewS3Session(awsAccessKey, awsSecretKey, awsRegion, awsBucket, awsS3EndPoint, awsS3PublicEndPoint)
 	log.Println("Started S3 session...")
 
 	// Adding HT_Proto Listener...
-	proto_listener := proto_sync.Initializer(ctx, s3Repository)
+	// disabling this for now
+	// proto_listener := proto_sync.Initializer(ctx, s3Repository)
 
 	// Create file fileProcessor with 20GB limit
 	fileProcessor, err := background.NewFileProcessor(
@@ -172,7 +179,8 @@ func main() {
 		log.Println("Waiting for file processor to finish...")
 		fileProcessor.Stop()
 
-		proto_listener.Stop()
+		// disabling proto_listener for now
+		// proto_listener.Stop()
 
 		// Gracefully disconnect from MongoDB
 		mongoShutdownCtx, mongoShutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
