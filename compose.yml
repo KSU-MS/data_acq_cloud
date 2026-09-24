@@ -1,0 +1,125 @@
+# Production stack. Configure .env and follow docker/README-deployment.md.
+# Tailscale runs on the HOST. Only loopback ports are published.
+services:
+  cloud_webserver_v2:
+    build:
+      context: ./cloud_webserver_v2
+    restart: unless-stopped
+    environment:
+      # Use a hex password (as documented) to avoid URI-encoding ambiguity.
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:?Set MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_RUN_BUCKET: ${AWS_S3_RUN_BUCKET:?Set AWS_S3_RUN_BUCKET}
+      AWS_ACCESS_KEY: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      AWS_S3_ENDPOINT: http://minio:9000
+      # Sign for the exact HTTPS host:8443 used by browsers, with no /s3 prefix.
+      AWS_S3_PUBLIC_ENDPOINT: ${AWS_S3_PUBLIC_ENDPOINT:?Set the host Tailscale HTTPS origin on port 8443}
+      ENV: PRODUCTION
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      minio-create-bucket:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    ports:
+      # Tailscale Serve exposes this loopback port on the tailnet.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - matlab_mps_data:/mps_data
+      - run_metadata:/data/run_metadata
+      - cloud_webserver_v2_files:/app/files
+      - cloud_webserver_v2_logs:/app/logs
+      - uploads_data:/app/uploads
+    networks:
+      - private
+
+  mongodb:
+    image: ${MONGO_IMAGE:-mongo:7}
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?Set MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+    # No ports: entry, including localhost. Administer with docker compose exec.
+    healthcheck:
+      # Avoid passing on Mongo's temporary localhost-only initialization server.
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --host mongodb
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --eval 'quit(db.adminCommand({ping: 1}).ok ? 0 : 1)'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - private
+
+  minio:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:latest}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_SITE_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - minio_data:/data
+    ports:
+      # Host Serve terminates TLS :8443 and forwards directly to this S3 port.
+      - "127.0.0.1:9000:9000"
+      # Host/SSH-tunnel administration only; the console is not exposed by Serve.
+      - "127.0.0.1:9001:9001"
+    networks:
+      - private
+
+  minio-create-bucket:
+    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:latest}
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      AWS_S3_RUN_BUCKET: ${AWS_S3_RUN_BUCKET:?Set AWS_S3_RUN_BUCKET}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        attempt=0
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc ready local; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 60 ]; then
+            echo "MinIO did not become ready" >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        mc mb --ignore-existing "local/$$AWS_S3_RUN_BUCKET"
+    restart: "no"
+    networks:
+      - private
+
+networks:
+  # Project-scoped bridge; no manually created external network is required.
+  private:
+
+volumes:
+  # Retain existing volume keys so data stays attached in the same project.
+  cloud_webserver_v2_files:
+  cloud_webserver_v2_logs:
+  run_metadata:
+  matlab_mps_data:
+  uploads_data:
+  mongodb_data:
+  minio_data:

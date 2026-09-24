@@ -1,0 +1,10 @@
+# Keep local credentials and generated recordings out of Docker builds.
+.env
+**/.env
+**/.env.*
+uploads/
+files/
+logs/
+**/*.mcap
+**/*.h5
+.DS_Store

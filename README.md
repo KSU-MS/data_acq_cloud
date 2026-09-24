@@ -2,6 +2,11 @@
 
 this repo contains the infrastructure that will be running in the cloud for ease of deployment
 
+For the current Go backend and frontend, see the
+[full Docker Compose + host Tailscale deployment guide](docker/README-deployment.md).
+For isolated local processing tests, see [the local Docker guide](docker/README-local.md).
+The older Python/Nix development instructions follow below.
+
 requirements:
 0. linux or MacOs environment (WSL works for windows)
 

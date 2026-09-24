@@ -135,7 +135,7 @@ func main() {
 
 	// CORS Setup
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://hytech-racing.github.io", "http://localhost:5173"},
+		AllowedOrigins:   []string{"https://ksu-ms.github.io", "https://hytech-racing.github.io", "http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
