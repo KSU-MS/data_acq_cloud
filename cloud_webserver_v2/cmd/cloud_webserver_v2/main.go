@@ -19,7 +19,6 @@ import (
 	"github.com/hytech-racing/cloud-webserver-v2/internal/logging"
 	hytech_middleware "github.com/hytech-racing/cloud-webserver-v2/internal/middleware"
 	"github.com/hytech-racing/cloud-webserver-v2/internal/mps"
-	proto_sync "github.com/hytech-racing/cloud-webserver-v2/internal/proto_sync"
 	"github.com/hytech-racing/cloud-webserver-v2/internal/s3"
 	"github.com/joho/godotenv"
 )
@@ -70,10 +69,10 @@ func main() {
 	}
 	log.Println("Connected to database...")
 
-	// Setup MPS
-	mpsURI := os.Getenv("MATLAB_URI")
-	mpsClient := mps.NewMatlabClient(dbClient, mpsURI, 1*time.Second)
-
+	// This deployment runs without a licensed MATLAB Production Server. A nil
+	// client makes script requests return 503; local MCAP-to-HDF5 conversion
+	// still runs. Restore NewMatlabClient initialization when MPS is configured.
+	var mpsClient *mps.MatlabClient
 	// Setup aws s3 connection
 	awsRegion := os.Getenv("AWS_REGION")
 	if awsRegion == "" {
@@ -99,13 +98,21 @@ func main() {
 	if awsS3EndPoint == "" {
 		log.Fatal("could not get aws s3 endpoint environment variable")
 	}
+	// Signed URLs are opened by users' browsers, which cannot resolve Docker's
+	// minio hostname. Require the reachable S3 API origin, including its scheme
+	// and port when non-default; DNS, TLS and ingress are configured separately.
+	awsS3PublicEndPoint := os.Getenv("AWS_S3_PUBLIC_ENDPOINT")
+	if awsS3PublicEndPoint == "" {
+		log.Fatal("could not get aws s3 public endpoint environment variable")
+	}
 
-	// We are creating one connection to AWS S3 and passing that around to all the methods to save resources
-	s3Repository := s3.NewS3Session(awsAccessKey, awsSecretKey, awsRegion, awsBucket, awsS3EndPoint)
+	// Share internal object access and external URL signing across handlers/jobs.
+	s3Repository := s3.NewS3Session(awsAccessKey, awsSecretKey, awsRegion, awsBucket, awsS3EndPoint, awsS3PublicEndPoint)
 	log.Println("Started S3 session...")
 
-	// Adding HT_Proto Listener...
-	proto_listener := proto_sync.Initializer(ctx, s3Repository)
+	// Automatic GitHub protobuf synchronization is disabled for this deployment.
+	// MCAP decoding still uses embedded schemas. To re-enable synchronization,
+	// restore proto_sync.Initializer here and stop its listener during shutdown.
 
 	// Create file fileProcessor with 20GB limit
 	fileProcessor, err := background.NewFileProcessor(
@@ -171,8 +178,6 @@ func main() {
 
 		log.Println("Waiting for file processor to finish...")
 		fileProcessor.Stop()
-
-		proto_listener.Stop()
 
 		// Gracefully disconnect from MongoDB
 		mongoShutdownCtx, mongoShutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
