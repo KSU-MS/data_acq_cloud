@@ -185,9 +185,10 @@ func (p *PostProcessMCAPUploadJob) ProcessFileJob(fp *FileProcessor, job *FileJo
 	vnTimeVelPlotFiles := []models.FileModel{vnTimeVelPlotFileEntry}
 	contentFiles["vn_time_vel_plot"] = vnTimeVelPlotFiles
 
+	// New uploads use the Kennesaw KS9E car label; users can edit run metadata.
 	vehicleRunModel := &models.VehicleRunModel{
 		Date:         job.Date,
-		CarModel:     "HT09",
+		CarModel:     "KS9E",
 		McapFiles:    mcapFiles,
 		MatFiles:     matFiles,
 		ContentFiles: contentFiles,
@@ -305,7 +306,7 @@ func routeMCAPDecodedMessage(ctx context.Context, decodedMessage *utils.DecodedM
 	switch topic := decodedMessage.Topic; topic {
 	case messaging.EOF:
 		subscriberNames = append(subscriberNames, possibleRoutes...)
-	case "hytech_msgs.VNData":
+	case "hytech_msgs.VNData", "vectornav_position":
 		subscriberNames = append(subscriberNames, messaging.LATLON, messaging.MATLAB)
 	case "hytech_msgs.VehicleData":
 		subscriberNames = append(subscriberNames, messaging.VELOCITY, messaging.MATLAB)
